@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>TP6 – Réutilisation du Q-Learning : environnement Coin Collector</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      line-height: 1.6;
+    }
+    h1, h2, h3 {
+      color: #1a4e8a;
+    }
+    code {
+      font-family: "Fira Code", "Consolas", monospace;
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .box {
+      border-left: 4px solid #1a4e8a;
+      padding-left: 10px;
+      margin: 15px 0;
+      background: #f8fbff;
+    }
+    ul, ol {
+      margin-left: 22px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>TP6 – Réutilisation du Q-Learning : environnement Coin Collector</h1>
+
+<div class="box">
+  <h2>Objectif pédagogique</h2>
+  <p>
+    Dans ce TP, vous allez réutiliser l'agent Q-Learning du TP4 dans un
+    <strong>nouvel environnement</strong> : un petit jeu de type
+    <em>Coin Collector</em> (collecte de pièces).
+  </p>
+  <p>
+    L'objectif est de comprendre que l'on peut <strong>séparer clairement</strong>
+    l'<em>agent</em> de l'<em>environnement</em> : l'algorithme d'apprentissage reste
+    le même, seuls les états, actions et récompenses changent.
+  </p>
+</div>
+
+<h2>1. Description de l'environnement Coin Collector</h2>
+
+<p>
+Nous travaillons sur une grille carrée de taille 5×5. On y trouve :
+</p>
+<ul>
+  <li>Une position de départ de l'agent (0,0).</li>
+  <li>Quelques pièces <strong>C</strong> à ramasser.</li>
+  <li>Des trous <strong>H</strong> à éviter.</li>
+  <li>Une case but <strong>G</strong> à atteindre pour terminer l'épisode.</li>
+</ul>
+
+<p>
+Les récompenses possibles sont par exemple :
+</p>
+<ul>
+  <li><code>-1</code> pour chaque déplacement (coût de mouvement),</li>
+  <li><code>+5</code> lorsqu'une pièce est ramassée,</li>
+  <li><code>-10</code> si l'agent tombe dans un trou (fin d'épisode),</li>
+  <li><code>+10</code> si l'agent atteint la case but (fin d'épisode).</li>
+</ul>
+
+<h2>2. Implémentation de l'environnement CoinWorld</h2>
+
+<p>
+Créez un nouveau fichier Python (par exemple <code>env_coinworld.py</code>) et implémentez la classe suivante :
+</p>
+
+<pre><code>class CoinWorld:
+    # Environnement simple &quot;Coin Collector&quot; sur une grille.
+    # - L&#x27;agent commence en (0,0).
+    # - Il y a quelques pièces C à ramasser.
+    # - Il y a des trous H à éviter.
+    # - Il y a une case but G à atteindre.
+    # Récompenses typiques :
+    #   -1 par déplacement
+    #   +5 pour une pièce ramassée
+    #   -10 si on tombe dans un trou
+    #   +10 si on atteint la case but G
+    def __init__(self, size=5):
+        self.size = size
+        self.reset()
+
+    def reset(self):
+        self.agent = (0, 0)
+        # Positions fixes pour simplifier, on peut les randomiser plus tard
+        self.coins = {(2, 2), (4, 1), (1, 3)}
+        self.holes = {(3, 3)}
+        self.goal = (4, 4)
+        return self.agent
+
+    def step(self, action):
+        x, y = self.agent
+
+        if action == &quot;up&quot;:
+            y -= 1
+        elif action == &quot;down&quot;:
+            y += 1
+        elif action == &quot;left&quot;:
+            x -= 1
+        elif action == &quot;right&quot;:
+            x += 1
+
+        # On reste dans la grille
+        x = max(0, min(self.size - 1, x))
+        y = max(0, min(self.size - 1, y))
+        self.agent = (x, y)
+
+        reward = -1  # coût de mouvement
+        done = False
+
+        # Pièce ramassée
+        if (x, y) in self.coins:
+            reward += 5
+            self.coins.remove((x, y))
+
+        # Trou
+        if (x, y) in self.holes:
+            reward -= 10
+            done = True
+
+        # But final
+        if (x, y) == self.goal:
+            reward += 10
+            done = True
+
+        return self.agent, reward, done, {}</code></pre>
+
+<div class="box">
+  <h3>Explications</h3>
+  <ul>
+    <li><code>reset()</code> initialise la position de l'agent, place les pièces, les trous et la case but. Cette méthode renvoie l'état initial.</li>
+    <li><code>step(action)</code> applique une action (up/down/left/right), met à jour la position de l'agent, calcule la récompense et indique si l'épisode est terminé.</li>
+    <li>Les positions des pièces et des trous sont fixes pour démarrer. Plus tard, vous pourrez les rendre aléatoires pour augmenter la difficulté.</li>
+  </ul>
+</div>
+
+<h2>3. Réutilisation de l'agent Q-Learning</h2>
+
+<p>
+Vous pouvez maintenant réutiliser exactement la classe <code>QLearningAgent</code> écrite au TP4.
+L'agent verra simplement un nouvel environnement, avec de nouvelles récompenses et une dynamique différente.
+</p>
+
+<p>
+Dans un fichier principal (<code>tp6_coin_collector.py</code>), écrivez par exemple :
+</p>
+
+<pre><code>env = CoinWorld(size=5)
+agent = QLearningAgent(actions=[&quot;up&quot;, &quot;down&quot;, &quot;left&quot;, &quot;right&quot;],
+                       alpha=0.1, gamma=0.9, epsilon=0.5)
+
+rewards_per_episode = []
+n_episodes = 1000
+max_steps = 100
+
+for episode in range(n_episodes):
+    state = env.reset()
+    total_reward = 0
+    done = False
+
+    for step in range(max_steps):
+        action = agent.choose_action(state)
+        next_state, reward, done, _ = env.step(action)
+        agent.update(state, action, reward, next_state)
+        state = next_state
+        total_reward += reward
+        if done:
+            break
+
+    rewards_per_episode.append(total_reward)
+
+import matplotlib.pyplot as plt
+
+plt.plot(rewards_per_episode)
+plt.xlabel(&quot;Épisode&quot;)
+plt.ylabel(&quot;Récompense totale&quot;)
+plt.title(&quot;Apprentissage dans CoinWorld (Coin Collector)&quot;)
+plt.grid(True)
+plt.show()</code></pre>
+
+<h2>4. Expérimentations</h2>
+
+<p>
+Comme dans les TP précédents, essayez de :
+</p>
+<ul>
+  <li>faire varier le nombre d'épisodes d'entraînement,</li>
+  <li>modifier les valeurs de <code>alpha</code>, <code>gamma</code> et <code>epsilon</code>,</li>
+  <li>changer la taille de la grille (par exemple 6×6),</li>
+  <li>modifier la disposition des pièces, des trous et de la case but.</li>
+</ul>
+
+<p>
+Observez comment ces modifications influencent la vitesse d'apprentissage et la récompense moyenne.
+</p>
+
+<h2>5. Questions</h2>
+
+<ul>
+  <li>L'agent parvient-il à apprendre une stratégie raisonnable dans cet environnement&nbsp;?</li>
+  <li>La courbe des récompenses cumulées est-elle plus bruyante ou plus stable que dans le labyrinthe&nbsp;? Pourquoi&nbsp;?</li>
+  <li>Est-ce que la présence de plusieurs pièces et d'un but final complexifie l'apprentissage&nbsp;?</li>
+  <li>Quelles différences majeures voyez-vous entre l'environnement labyrinthe et CoinWorld du point de vue de la modélisation logicielle (états, récompenses, transitions)&nbsp;?</li>
+</ul>
+
+<p>
+Ce TP doit vous faire prendre conscience que l'apprentissage par renforcement est une approche générique :
+une fois l'algorithme implémenté, vous pouvez l'appliquer à toute une variété de jeux ou de systèmes,
+à condition de bien définir les <strong>états</strong>, les <strong>actions</strong> et les <strong>récompenses</strong>.
+</p>
+
+</body>
+</html>

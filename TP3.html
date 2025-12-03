@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>TP3 – Labyrinthe : agent aléatoire et notions d’environnement RL</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      line-height: 1.6;
+    }
+    h1, h2, h3 {
+      color: #1a4e8a;
+    }
+    code {
+      font-family: "Fira Code", "Consolas", monospace;
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .box {
+      border-left: 4px solid #1a4e8a;
+      padding-left: 10px;
+      margin: 15px 0;
+      background: #f8fbff;
+    }
+    ul, ol {
+      margin-left: 22px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>TP3 – Labyrinthe : agent aléatoire et notions d’environnement RL</h1>
+
+<div class="box">
+  <h2>Objectif pédagogique</h2>
+  <p>
+    Dans ce TP, vous allez construire un <strong>environnement de labyrinthe</strong> et un
+    <strong>agent aléatoire</strong> qui s'y déplace, en posant les bases des notions
+    d'<em>apprentissage par renforcement</em> :
+  </p>
+  <ul>
+    <li><strong>état</strong> (position de l'agent dans la grille),</li>
+    <li><strong>actions</strong> (haut, bas, gauche, droite),</li>
+    <li><strong>transition</strong> (comment l'action modifie l'état),</li>
+    <li><strong>récompense</strong> (feedback positif ou négatif),</li>
+    <li><strong>épisode</strong> (une partie qui commence au départ et se termine au but ou dans un trou).</li>
+  </ul>
+  <p>
+    Dans ce TP, l'agent <strong>n'apprend pas encore</strong> : il choisit ses actions au hasard.
+    L'objectif est surtout de bien comprendre le rôle de l'environnement et de la boucle de simulation,
+    ce qui vous préparera au Q-Learning dans le TP4.
+  </p>
+</div>
+
+<h2>1. Rappel : vocabulaire RL (sans formules)</h2>
+
+<ul>
+  <li><strong>Agent</strong> : le "joueur" qui prend des décisions (ici, notre petit personnage dans le labyrinthe).</li>
+  <li><strong>Environnement</strong> : le monde dans lequel l'agent évolue (la grille, les murs, le départ, le but, les trous).</li>
+  <li><strong>État</strong> : une description de la situation actuelle. Ici : la position de l'agent dans la grille, notée <code>(x, y)</code>.</li>
+  <li><strong>Actions</strong> : ce que l'agent peut faire à partir d'un état (monter, descendre, aller à gauche, aller à droite).</li>
+  <li><strong>Récompense</strong> : un nombre donné après chaque action pour indiquer à quel point le résultat est bon ou mauvais.</li>
+  <li><strong>Épisode</strong> : une séquence d'actions de l'état de départ jusqu'à une fin (but atteint, trou, ou nombre de pas maximum atteint).</li>
+</ul>
+
+<h2>2. La carte du labyrinthe</h2>
+
+<p>
+On représente la carte sous forme de chaîne de caractères multi-ligne. Par exemple :
+</p>
+
+<pre><code>S..#
+.#..
+..#.
+..G.
+</code></pre>
+
+<ul>
+  <li><code>S</code> = case de départ (Start)</li>
+  <li><code>G</code> = case but (Goal)</li>
+  <li><code>#</code> = mur (infranchissable)</li>
+  <li><code>.</code> = case libre</li>
+  <li>(optionnel) <code>H</code> = trou (Hole) qui termine l'épisode avec une pénalité</li>
+</ul>
+
+<p>
+Le code complet de référence pour ce TP est donné ci-dessous. Vous n'êtes pas obligés de tout écrire
+à la main, mais vous devez le comprendre et être capables de l'expliquer.
+</p>
+
+<h2>3. Code complet de référence</h2>
+
+<pre><code>import random
+from typing import Tuple, List
+
+# Labyrinthe 4x4 (S = start, G = goal, H = hole, # = mur, . = case libre)
+MAP_STR = &quot;&quot;&quot;
+S..#
+.#..
+..#.
+..G.
+&quot;&quot;&quot;.strip(&quot;\n&quot;)
+
+ACTIONS = [&quot;up&quot;, &quot;down&quot;, &quot;left&quot;, &quot;right&quot;]  # espace d&#x27;actions
+
+def parse_map(map_str: str) -&gt; Tuple[List[List[str]], Tuple[int,int], Tuple[int,int], List[Tuple[int,int]]]:
+    grid = [list(row) for row in map_str.splitlines()]
+    start = goal = None
+    holes = []
+    for y, row in enumerate(grid):
+        for x, c in enumerate(row):
+            if c == &quot;S&quot;:
+                start = (x, y)
+            elif c == &quot;G&quot;:
+                goal = (x, y)
+            elif c == &quot;H&quot;:
+                holes.append((x, y))
+    assert start and goal, &quot;La carte doit contenir S (start) et G (goal).&quot;
+    return grid, start, goal, holes
+
+class Labyrinth:
+    &quot;&quot;&quot;
+    Environnement labyrinthe.
+    Récompenses:
+      -1 à chaque pas,
+      +10 quand on atteint G (fin d&#x27;épisode),
+      -5 si on tombe dans un trou H (fin d&#x27;épisode).
+    Les murs (#) sont bloquants.
+    &quot;&quot;&quot;
+
+    def __init__(self, map_str: str, slip_prob: float = 0.0):
+        self.grid, self.start, self.goal, self.holes = parse_map(map_str)
+        self.h = len(self.grid)
+        self.w = len(self.grid[0])
+        self.state = self.start
+        self.slip_prob = slip_prob  # probabilité de &quot;glisser&quot; à gauche au lieu de l&#x27;action voulue
+
+    def reset(self) -&gt; Tuple[int,int]:
+        self.state = self.start
+        return self.state
+
+    def _move(self, x: int, y: int, action: str) -&gt; Tuple[int,int]:
+        if action == &quot;up&quot;:
+            y -= 1
+        if action == &quot;down&quot;:
+            y += 1
+        if action == &quot;left&quot;:
+            x -= 1
+        if action == &quot;right&quot;:
+            x += 1
+
+        # bords de la grille
+        x = max(0, min(self.w - 1, x))
+        y = max(0, min(self.h - 1, y))
+
+        # mur bloquant
+        if self.grid[y][x] == &quot;#&quot;:
+            return self.state  # on reste sur place si mur
+        return (x, y)
+
+    def step(self, action: str):
+        assert action in ACTIONS
+        x, y = self.state
+
+        # petite stochasticité optionnelle (slip): l&#x27;action se transforme en &quot;left&quot; avec prob slip_prob
+        if self.slip_prob &gt; 0 and random.random() &lt; self.slip_prob:
+            action = &quot;left&quot;
+
+        next_state = self._move(x, y, action)
+        self.state = next_state
+
+        # récompenses &amp; terminaison
+        if next_state == self.goal:
+            return next_state, 10, True, {}
+        if next_state in self.holes:
+            return next_state, -5, True, {}
+        return next_state, -1, False, {}
+
+    def render(self) -&gt; None:
+        &quot;&quot;&quot;Affiche la grille avec la position de l&#x27;agent.&quot;&quot;&quot;
+        display = [row[:] for row in self.grid]
+        ax, ay = self.state
+        # n&#x27;écrase pas S/G/H/#
+        if display[ay][ax] == &quot;.&quot;:
+            display[ay][ax] = &quot;A&quot;  # agent
+        print()
+        for row in display:
+            print(&quot; &quot;.join(row))
+        print()
+
+class RandomAgent:
+    def __init__(self, actions):
+        self.actions = actions
+
+    def choose_action(self, state: Tuple[int,int]) -&gt; str:
+        return random.choice(self.actions)
+
+def run_demo(episodes=1, max_steps=20, seed=None, slip_prob=0.0):
+    if seed is not None:
+        random.seed(seed)
+
+    env = Labyrinth(MAP_STR, slip_prob=slip_prob)
+    agent = RandomAgent(ACTIONS)
+
+    for ep in range(1, episodes + 1):
+        state = env.reset()
+        total_reward = 0
+        print(f&quot;\\n=== Épisode {ep} — start={state}, goal={env.goal}, slip_prob={env.slip_prob} ===&quot;)
+        env.render()
+
+        for t in range(1, max_steps + 1):
+            action = agent.choose_action(state)
+            next_state, reward, done, _ = env.step(action)
+            total_reward += reward
+            print(f&quot;t={t:02d} | état={state} --action={action:5s}--&gt; état&#x27;={next_state} | récompense={reward:+d}&quot;)
+            env.render()
+            state = next_state
+            if done:
+                fin = &quot;GOAL&quot; if state == env.goal else (&quot;HOLE&quot; if state in env.holes else &quot;TERM&quot;)
+                print(f&quot;Fin d&#x27;épisode: {fin} en {t} pas | Retour cumulé = {total_reward:+d}&quot;)
+                break
+        else:
+            print(f&quot;Fin (max_steps atteints) | Retour cumulé = {total_reward:+d}&quot;)
+
+if __name__ == &quot;__main__&quot;:
+    run_demo(episodes=2, max_steps=20, seed=42, slip_prob=0.0)
+</code></pre>
+
+<h2>4. Analyse de la classe <code>Labyrinth</code></h2>
+
+<div class="box">
+  <h3>Points à comprendre</h3>
+  <ul>
+    <li><code>parse_map()</code> transforme la chaîne en grille et trouve les positions de S, G et (éventuellement) H.</li>
+    <li><code>reset()</code> remet l'état au point de départ et renvoie la nouvelle position de l'agent.</li>
+    <li><code>_move()</code> applique l'action (up/down/left/right) et gère les bords ainsi que les murs.</li>
+    <li><code>step()</code> :
+      <ul>
+        <li>prend l'action en entrée,</li>
+        <li>met à jour la position de l'agent,</li>
+        <li>calcule la récompense (−1, +10, −5),</li>
+        <li>indique si l'épisode est terminé (<code>done=True</code>).</li>
+      </ul>
+    </li>
+    <li><code>render()</code> affiche le labyrinthe et place un <code>A</code> là où se trouve l'agent.</li>
+  </ul>
+</div>
+
+<h2>5. Stochasticité : la probabilité de glisser</h2>
+
+<p>
+Notez la présence du paramètre <code>slip_prob</code>. Il modélise une incertitude sur les actions :
+même si l'agent demande une action, l'environnement peut faire autre chose (ici, remplacer l'action par <code>"left"</code>).
+C'est une manière simple de rendre l'environnement <strong>stochastique</strong> (non déterministe).
+</p>
+
+<h2>6. L'agent aléatoire et la boucle d'épisodes</h2>
+
+<p>
+La classe <code>RandomAgent</code> illustre un agent qui ne réfléchit pas : il choisit une action au hasard
+parmi <code>ACTIONS</code>. La fonction <code>run_demo()</code> montre comment :
+</p>
+
+<ul>
+  <li>réinitialiser l'environnement au début de chaque épisode,</li>
+  <li>laisser l'agent interagir pas à pas avec l'environnement,</li>
+  <li>afficher l'évolution de l'état, des actions et des récompenses.</li>
+</ul>
+
+<h2>7. Travail demandé</h2>
+
+<ol>
+  <li>
+    <strong>Lecture du code :</strong> ajoutez vos propres commentaires dans le fichier Python pour expliquer chaque méthode
+    (<code>parse_map</code>, <code>reset</code>, <code>step</code>, <code>render</code>, etc.).
+  </li>
+  <li>
+    <strong>Expérimentations :</strong>
+    <ul>
+      <li>Exécutez <code>run_demo()</code> avec différents nombres d'épisodes et de pas maximum.</li>
+      <li>Modifiez <code>slip_prob</code> (par ex. 0.0, 0.2, 0.5) et observez l'effet sur les trajectoires.</li>
+      <li>Ajoutez un trou <code>H</code> dans la carte et vérifiez que les récompenses et la fin d'épisode fonctionnent comme prévu.</li>
+    </ul>
+  </li>
+  <li>
+    <strong>Réflexion :</strong>
+    <ul>
+      <li>L'agent atteint-il souvent la case but avec une politique aléatoire ?</li>
+    </ul>
+  </li>
+</ol>
+
+<h2>8. Lien avec le TP4</h2>
+
+<p>
+Dans le TP4, vous utiliserez exactement le même environnement <code>Labyrinth</code>, mais vous remplacerez
+l'agent aléatoire par un <strong>agent Q-Learning</strong> qui apprend à décider quelles actions sont les meilleures
+dans chaque état, en utilisant les récompenses comme signal d'apprentissage.
+</p>
+
+</body>
+</html>

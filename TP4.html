@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>TP4 – Découverte du Q-Learning dans un labyrinthe</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      line-height: 1.6;
+    }
+    h1, h2, h3 {
+      color: #1a4e8a;
+    }
+    code {
+      font-family: "Fira Code", "Consolas", monospace;
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .box {
+      border-left: 4px solid #1a4e8a;
+      padding-left: 10px;
+      margin: 15px 0;
+      background: #f8fbff;
+    }
+    ul, ol {
+      margin-left: 22px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>TP4 – Découverte du Q-Learning dans un labyrinthe</h1>
+
+<div class="box">
+  <h2>Objectif pédagogique</h2>
+  <p>
+    Dans ce TP, vous allez transformer l'agent aléatoire du labyrinthe (TP3) en un agent
+    <strong>intelligent</strong> qui apprend de ses erreurs grâce à l'algorithme de
+    <strong>Q-Learning</strong>.
+  </p>
+  <p>
+    Jusqu'ici, l'agent choisissait ses actions au hasard. Désormais, il va construire une
+    <strong>table de valeurs Q</strong> lui permettant de décider quelles actions sont les plus
+    intéressantes dans chaque état.
+  </p>
+</div>
+
+<h2>1. Rappel : principe du Q-Learning</h2>
+<p>
+Le Q-Learning est un algorithme d'apprentissage par renforcement où l'agent apprend une fonction
+Q(s, a) qui estime la qualité d'une action <code>a</code> dans un état <code>s</code>.
+</p>
+
+<p>La mise à jour de Q se fait avec la formule :</p>
+
+<pre><code>Q(s,a) = Q(s,a) + α × [ r + γ × max_a' Q(s', a') − Q(s,a) ]</code></pre>
+
+<ul>
+  <li><strong>Q(s,a)</strong> : valeur actuelle de l'action <code>a</code> dans l'état <code>s</code></li>
+  <li><strong>r</strong> : récompense reçue après avoir joué cette action</li>
+  <li><strong>s'</strong> : nouvel état après l'action</li>
+  <li><strong>α</strong> (alpha) : taux d'apprentissage (entre 0 et 1)</li>
+  <li><strong>γ</strong> (gamma) : facteur de discount (importance du futur)</li>
+  <li><strong>max_a' Q(s', a')</strong> : meilleure valeur Q possible depuis l'état <code>s'</code></li>
+</ul>
+
+<h2>2. Préparation du TP</h2>
+<ol>
+  <li>Copiez votre code du TP3 (labyrinthe) dans un nouveau fichier, par exemple <code>tp4_qlearning_labyrinthe.py</code>.</li>
+  <li>Conservez la classe <code>Labyrinth</code> telle quelle : elle représente l'environnement (la grille, les murs, la position de départ, la case but, etc.).</li>
+  <li>Vous pouvez supprimer la classe <code>RandomAgent</code> : nous allons la remplacer par un agent qui apprend.</li>
+</ol>
+
+<h2>3. Implémentation de l'agent Q-Learning</h2>
+<p>
+Créez une nouvelle classe <code>QLearningAgent</code>. Cet agent va contenir :
+</p>
+<ul>
+  <li>une table Q (un dictionnaire Python),</li>
+  <li>les hyperparamètres <code>alpha</code>, <code>gamma</code>, <code>epsilon</code>,</li>
+  <li>des méthodes pour choisir une action et mettre à jour la Q-table.</li>
+</ul>
+
+<pre><code>class QLearningAgent:
+    def __init__(self, actions, alpha=0.1, gamma=0.9, epsilon=0.3):
+        self.actions = actions          # Liste des actions possibles
+        self.alpha = alpha              # Taux d&#x27;apprentissage
+        self.gamma = gamma              # Facteur de discount
+        self.epsilon = epsilon          # Probabilité d&#x27;explorer (random)
+        self.Q = {}                     # Dictionnaire Q-table : {(state, action): valeur}
+
+    def get_Q(self, state, action):
+        # Retourne la valeur Q(s,a), 0 si pas encore explorée
+        return self.Q.get((state, action), 0.0)
+
+    def choose_action(self, state):
+        # Politique ε-greedy : parfois aléatoire, sinon meilleure action connue
+        import random
+        if random.random() &lt; self.epsilon:
+            # Exploration : on choisit une action au hasard
+            return random.choice(self.actions)
+        # Exploitation : on choisit l&#x27;action avec la meilleure valeur Q
+        q_values = [self.get_Q(state, a) for a in self.actions]
+        max_q = max(q_values)
+        # Si plusieurs actions ont la même valeur, on prend la première
+        return self.actions[q_values.index(max_q)]
+
+    def update(self, state, action, reward, next_state):
+        # Calcul de la meilleure Q du prochain état
+        future_q = max([self.get_Q(next_state, a) for a in self.actions])
+        old_q = self.get_Q(state, action)
+        # Application de la formule du Q-learning :
+        # Q(s,a) &lt;- Q(s,a) + α * [ r + γ * max_a&#x27; Q(s&#x27;,a&#x27;) - Q(s,a) ]
+        new_q = old_q + self.alpha * (reward + self.gamma * future_q - old_q)
+        self.Q[(state, action)] = new_q</code></pre>
+
+<div class="box">
+  <h3>Explications importantes</h3>
+  <ul>
+    <li><code>self.Q</code> est un dictionnaire où la clé est un couple <code>(state, action)</code> et la valeur est un nombre réel (la qualité estimée).</li>
+    <li><code>get_Q</code> renvoie 0.0 si l'état-action n'a jamais été rencontré : au début, l'agent ne sait rien.</li>
+    <li><code>choose_action</code> applique une politique <strong>ε-greedy</strong> : avec probabilité ε, on explore (action aléatoire), sinon on choisit la meilleure action connue.</li>
+    <li><code>update</code> applique directement la formule de Q-Learning vue plus haut.</li>
+  </ul>
+</div>
+
+<h2>4. Boucle d'apprentissage dans le labyrinthe</h2>
+<p>
+Nous allons maintenant faire jouer l'agent dans le labyrinthe pendant plusieurs épisodes. À chaque épisode,
+l'agent démarre à la case de départ et essaie d'atteindre la case but.
+</p>
+
+<pre><code>env = Labyrinth(MAP_STR)
+agent = QLearningAgent(actions=[&quot;up&quot;, &quot;down&quot;, &quot;left&quot;, &quot;right&quot;],
+                       alpha=0.1, gamma=0.9, epsilon=0.3)
+
+rewards_per_episode = []
+
+n_episodes = 500
+max_steps = 100
+
+for episode in range(n_episodes):
+    state = env.reset()
+    total_reward = 0
+    done = False
+
+    for step in range(max_steps):
+        action = agent.choose_action(state)
+        next_state, reward, done, _ = env.step(action)
+        agent.update(state, action, reward, next_state)
+        state = next_state
+        total_reward += reward
+        if done:
+            break
+
+    rewards_per_episode.append(total_reward)
+
+# Visualisation de la progression de l&#x27;apprentissage
+import matplotlib.pyplot as plt
+
+plt.plot(rewards_per_episode)
+plt.xlabel(&quot;Épisode&quot;)
+plt.ylabel(&quot;Récompense totale&quot;)
+plt.title(&quot;Évolution de l&#x27;apprentissage dans le labyrinthe&quot;)
+plt.grid(True)
+plt.show()</code></pre>
+
+<div class="box">
+  <h3>À observer</h3>
+  <ul>
+    <li>La liste <code>rewards_per_episode</code> contient la récompense cumulée sur chaque épisode.</li>
+    <li>Si l'apprentissage fonctionne, la courbe des récompenses devrait <strong>globalement augmenter</strong> au fil des épisodes (l'agent trouve de meilleurs chemins).</li>
+  </ul>
+</div>
+
+<h2>5. Visualiser la politique apprise</h2>
+<p>
+Une fois l'entraînement terminé, on peut inspecter la politique apprise en affichant, pour chaque case, la meilleure action selon la Q-table (flèches ↑ ↓ ← →).
+</p>
+
+<pre><code>for y in range(env.h):
+    row = &quot;&quot;
+    for x in range(env.w):
+        state = (x, y)
+        # On ignore les murs
+        if env.grid[y][x] == &quot;#&quot;:
+            row += &quot;# &quot;
+            continue
+        q_values = [agent.get_Q(state, a) for a in agent.actions]
+        if not any(q_values):
+            symbol = &quot;?&quot;
+        else:
+            best_action = agent.actions[q_values.index(max(q_values))]
+            if best_action == &quot;up&quot;:
+                symbol = &quot;↑&quot;
+            elif best_action == &quot;down&quot;:
+                symbol = &quot;↓&quot;
+            elif best_action == &quot;left&quot;:
+                symbol = &quot;←&quot;
+            else:
+                symbol = &quot;→&quot;
+        row += symbol + &quot; &quot;
+    print(row)</code></pre>
+
+<p>
+Vous devriez voir apparaître une "direction préférée" qui guide l'agent de la position de départ à la case but.
+</p>
+
+<h2>6. Questions</h2>
+<ul>
+  <li>Comment évolue la récompense moyenne au fil des épisodes ?</li>
+  <li>L'agent finit-il par atteindre le but de manière presque systématique ?</li>
+  <li>Que se passe-t-il si vous changez les valeurs de <code>alpha</code>, <code>gamma</code> ou <code>epsilon</code> ?</li>
+</ul>
+
+</body>
+</html>

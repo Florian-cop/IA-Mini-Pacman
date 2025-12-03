@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Projet – Mini-Pacman avec apprentissage par renforcement</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; line-height: 1.6; }
+    h1, h2, h3 { color: #1a4e8a; }
+    code { font-family: "Fira Code", "Consolas", monospace; background-color: #f5f5f5; padding: 2px 4px; border-radius: 4px; }
+    .box { border-left: 4px solid #1a4e8a; padding-left: 10px; margin: 15px 0; background: #f8fbff; }
+    ul, ol { margin-left: 22px; }
+  </style>
+</head>
+<body>
+<h1>Projet – Mini-Pacman avec apprentissage par renforcement</h1>
+
+<div class="box">
+  <h2>Contexte</h2>
+  <p>
+    Ce projet prolonge les TPs du module d'apprentissage par renforcement :
+  </p>
+  <ul>
+    <li>TP1/TP2 : hasard, récompenses, simulation (pile ou face)</li>
+    <li>TP3 : environnement labyrinthe et agent aléatoire</li>
+    <li>TP4 : Q-Learning sur le labyrinthe</li>
+    <li>TP5 : exploration et réglage des hyperparamètres</li>
+    <li>TP6 : Coin Collector avec Q-Learning</li>
+  </ul>
+  <p>
+    Vous allez maintenant concevoir un <strong>Mini-Pacman</strong> sur grille, dans lequel un agent
+    apprend à ramasser des pièces tout en évitant un fantôme.
+  </p>
+</div>
+
+<h2>1. Objectif du projet</h2>
+
+<p>
+Vous devez implémenter un jeu <strong>Mini-Pacman</strong> simplifié, dans lequel :
+</p>
+<ul>
+  <li>Pacman (l'agent) se déplace sur une grille,</li>
+  <li>il ramasse des pièces pour gagner des points,</li>
+  <li>il doit éviter un fantôme qui se déplace de manière aléatoire ou avec une règle simple,</li>
+  <li>il apprend une politique de jeu grâce au <strong>Q-Learning</strong>.</li>
+</ul>
+
+<p>
+L'objectif est de réutiliser la structure Agent / Environnement vue en TP,
+et de réfléchir à une bonne <strong>modélisation des états, actions et récompenses</strong>.
+</p>
+
+<h2>2. Description du jeu Mini-Pacman</h2>
+
+<ul>
+  <li>Le jeu se déroule sur une grille (par exemple 10 × 10), contenant :
+    <ul>
+      <li>des murs (<code>#</code>),</li>
+      <li>des cases libres (<code>.</code>),</li>
+      <li>des pièces à ramasser (<code>C</code>),</li>
+      <li>la position de Pacman (<code>P</code>),</li>
+      <li>la position du fantôme (<code>F</code>).</li>
+    </ul>
+  </li>
+  <li>À chaque tour :
+    <ul>
+      <li>Pacman choisit une action (haut, bas, gauche, droite),</li>
+      <li>le fantôme se déplace ensuite (au choix :
+        <ul>
+          <li>déplacement aléatoire valide,</li>
+          <li>ou règle simple : se rapprocher de Pacman s'ils sont sur la même ligne/colonne).</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li>Si Pacman marche sur une case contenant une pièce, celle-ci est ramassée (et disparaît).</li>
+  <li>Un épisode se termine si :
+    <ul>
+      <li>Pacman se fait attraper par le fantôme (même case),</li>
+      <li>toutes les pièces sont ramassées,</li>
+      <li>un nombre maximal de pas est atteint.</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>3. Modélisation RL à fournir</h2>
+
+<p>
+Comme pour le labyrinthe et Coin Collector, vous devez définir :
+</p>
+<ul>
+  <li>l'espace des états,</li>
+  <li>l'espace des actions,</li>
+  <li>la fonction de récompense.</li>
+</ul>
+
+<h3>3.1. États</h3>
+<p>
+Proposez une représentation d'état permettant à Pacman de raisonner efficacement.
+Quelques éléments possibles :
+</p>
+<ul>
+  <li>Position de Pacman <code>(px, py)</code>,</li>
+  <li>Position du fantôme <code>(fx, fy)</code> ou position relative du fantôme par rapport à Pacman,</li>
+  <li>Nombre de pièces restantes (ou carte simplifiée des pièces),</li>
+  <li>Informations locales : présence ou non d'un mur autour de Pacman.</li>
+</ul>
+<p>
+Votre choix doit être <strong>justifié</strong> dans le rapport : pourquoi cette représentation est-elle pertinente ?
+</p>
+
+<h3>3.2. Actions</h3>
+<p>Les actions possibles de Pacman sont :</p>
+<ul>
+  <li><code>up</code></li>
+  <li><code>down</code></li>
+  <li><code>left</code></li>
+  <li><code>right</code></li>
+</ul>
+<p>
+Vous devez définir clairement ce qui se passe si Pacman tente de traverser un mur (action ignorée, pénalité, etc.).
+</p>
+
+<h3>3.3. Récompenses</h3>
+<p>Proposition de barème (modulable si vous l'expliquez) :</p>
+<ul>
+  <li><strong>+5</strong> : Pacman ramasse une pièce,</li>
+  <li><strong>+20</strong> : toutes les pièces sont ramassées (fin d'épisode positive),</li>
+  <li><strong>−20</strong> : Pacman est attrapé par le fantôme (fin d'épisode négative),</li>
+  <li><strong>−0.1</strong> : à chaque pas, pour éviter qu'il tourne en rond.</li>
+</ul>
+<p>
+Vous pouvez ajuster ces valeurs si vous argumentez vos choix.
+</p>
+
+<h2>4. Couche Web à ajouter</h2>
+
+<p>
+En plus du code Python « noyau » (environnement Mini-Pacman, agent Q-Learning, fonctions d'entraînement),
+vous devez ajouter une <strong>interface Web</strong> qui permet :
+</p>
+
+<h3>4.1. Onglet <em>Training</em></h3>
+<p>
+Une page ou un onglet « Training » avec :
+</p>
+<ul>
+  <li>un formulaire pour configurer les paramètres d'entraînement :
+    <ul>
+      <li>nombre d'épisodes,</li>
+      <li>nombre de pas maximal par épisode,</li>
+      <li>valeurs de <code>alpha</code>, <code>gamma</code>, <code>epsilon</code>,</li>
+      <li>éventuellement taille de la grille, nombre de pièces, etc.</li>
+    </ul>
+  </li>
+  <li>un bouton « Lancer l'entraînement » qui exécute votre script d'apprentissage avec ces paramètres.</li>
+  <li>un message de retour indiquant que l'entraînement est terminé (avec éventuellement quelques statistiques texte : récompense moyenne, pourcentage d'épisodes réussis, etc.).</li>
+</ul>
+
+<h3>4.2. Onglet <em>Résultats</em></h3>
+<p>
+Une page ou un onglet « Résultats » qui affiche au moins :
+</p>
+<ul>
+  <li>une <strong>courbe de récompense moyenne par épisode</strong>,</li>
+  <li>et si possible une courbe du nombre moyen de pièces ramassées par épisode.</li>
+</ul>
+<p>
+Il devra aussi rappeler les paramètres utilisés pour l'entraînement correspondant.
+</p>
+<p>
+Option fortement recommandée :
+</p>
+<ul>
+  <li>un bouton « Rejouer une partie » qui lance une partie de démonstration avec la politique apprise,
+      et affiche l'évolution de Pacman et du fantôme (par exemple sous forme de grille ASCII ou sous forme d'animation simple).</li>
+</ul>
+
+<h2>5. Livrables attendus</h2>
+
+<ul>
+  <li><strong>Code source complet</strong> :
+    <ul>
+      <li>environnement Mini-Pacman,</li>
+      <li>agent Q-Learning,</li>
+      <li>scripts d'entraînement,</li>
+      <li>interface Web.</li>
+    </ul>
+  </li>
+  <li><strong>Interface Web fonctionnelle</strong> avec onglets Training et Résultats.</li>
+  <li><strong>Graphiques</strong> montrant l'évolution de la performance (récompense moyenne, pièces ramassées, etc.).</li>
+  <li><strong>Rapport ou présentation</strong> (2 à 4 pages / slides) contenant :
+    <ul>
+      <li>la description de la modélisation (états, actions, récompenses),</li>
+      <li>les choix d'hyperparamètres,</li>
+      <li>une analyse des résultats obtenus,</li>
+      <li>les limites et pistes d'amélioration (ex : complexité de l'état, comportement du fantôme, etc.).</li>
+    </ul>
+  </li>
+  <li><strong>Démo orale</strong> durant laquelle vous montrerez :
+    <ul>
+      <li>votre interface Web,</li>
+      <li>un lancement d'entraînement (ou un résumé),</li>
+      <li>une partie jouée par l'agent entraîné.</li>
+    </ul>
+  </li>
+</ul>
+
+</body>
+</html>
