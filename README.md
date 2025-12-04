@@ -1,89 +1,80 @@
 # Mini-Pacman avec Q-Learning
 
-Projet d'apprentissage par renforcement - ESGI 5ème année
+Agent intelligent apprenant à jouer à Pacman via Q-Learning.
 
 ## Description
 
-Mini-Pacman est un jeu simplifié sur grille 10×10 où un agent (Pacman) apprend à ramasser des pièces tout en évitant des fantômes, grâce à l'algorithme Q-Learning.
+Pacman apprend de manière autonome à collecter des pièces dans un labyrinthe 10×10 tout en évitant 3 fantômes mobiles. L'agent utilise l'algorithme Q-Learning avec un espace d'états réduit à 1600 configurations pour un apprentissage rapide.
 
-## Architecture du projet
-
-```
-PROJECT_MINI_PACMAN/
-├── backend/
-│   ├── environment.py      # Environnement MiniPacman
-│   ├── agent.py            # Agent Q-Learning
-│   ├── training.py         # Fonctions d'entraînement
-│   ├── api.py              # API Flask
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/     # Composants Vue.js
-│   │   ├── App.vue
-│   │   └── main.js
-│   └── package.json
-├── saved_models/           # Q-tables sauvegardées
-├── results/                # Graphiques générés
-└── README.md
-```
+L'environnement inclut des power-ups permettant à Pacman de devenir invincible et de manger les fantômes. Un système de récompenses progressif guide l'apprentissage vers des stratégies efficaces.
 
 ## Installation
 
-### Backend (Python)
+### Prérequis
+
+- Python 3.8+
+- Node.js 16+
+- npm
+
+### Backend
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### Frontend (Vue.js)
+### Frontend
 
 ```bash
 cd frontend
 npm install
 ```
 
-## Utilisation
+## Lancement
 
-### Lancer le backend
+Ouvrir deux terminaux :
 
+**Terminal 1 - Backend :**
 ```bash
 cd backend
 python api.py
 ```
+Le serveur démarre sur http://localhost:5000
 
-### Lancer le frontend
-
+**Terminal 2 - Frontend :**
 ```bash
 cd frontend
 npm run dev
 ```
+L'interface s'ouvre sur http://localhost:5173
 
-## Fonctionnalités
+## Structure
 
-- ✅ Environnement MiniPacman configurable (taille grille, nombre de fantômes)
-- ✅ Apprentissage par Q-Learning
-- ✅ Interface web avec Vue.js
-- ✅ Visualisation en temps réel
-- ✅ Graphiques de performance (Matplotlib)
-- ✅ Replay de parties apprises
+```
+backend/
+  environment.py    Environnement de jeu
+  agent.py          Agent Q-Learning
+  training.py       Entraînement
+  api.py            API Flask
 
-## Modélisation RL
+frontend/
+  src/
+    components/     Composants Vue
+    App.vue         Application principale
+```
 
-### États
-- Position de Pacman (px, py)
-- Position des fantômes
-- Pièces restantes
+## Apprentissage
 
-### Actions
-- `up`, `down`, `left`, `right`
+L'agent réduit la complexité en utilisant :
+- 16 zones au lieu de 100 cases exactes
+- Danger binaire (fantôme proche ou non)
+- Direction vers objectif (5 valeurs)
+- Progression par tranches de 25%
 
-### Récompenses
-- **+5** : ramasser une pièce
-- **+20** : ramasser toutes les pièces
-- **-20** : attrapé par un fantôme
-- **-0.1** : coût de déplacement
+Espace d'états : 1600 (au lieu de millions)
+Taille Q-table : ~6000 entrées
 
-## Auteur
-
-Projet réalisé dans le cadre du cours IA pour les Jeux - ESGI 2025
+Récompenses :
+- +10-15 par pièce collectée
+- +50 pour manger un fantôme
+- -10 pour perdre une vie
